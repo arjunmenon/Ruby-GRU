@@ -19,12 +19,12 @@ def dtanh(x)
 end
 
 class NN
-	def initialize(nin, nhidden, nout)
-		wstd = 0.1
-		@w1 = Numo::DFloat.new(nin, nhidden).rand_norm*wstd
-		@wiv = Numo::DFloat.zeros(nin, nhidden)
-		@b1 = Numo::DFloat.zeros(nhidden)
-		@b1v = Numo::DFloat.zeros(nhidden)
+    def initialize(nin, nhidden, nout)
+	wstd = 0.1
+	@w1 = Numo::DFloat.new(nin, nhidden).rand_norm*wstd
+	@wiv = Numo::DFloat.zeros(nin, nhidden)
+	@b1 = Numo::DFloat.zeros(nhidden)
+	@b1v = Numo::DFloat.zeros(nhidden)
 
         @wz = Numo::DFloat.new(2*nhidden,nhidden).rand_norm*wstd
         @wzv = Numo::DFloat.zeros(2*nhidden,nhidden) # the weight velocit
@@ -48,27 +48,28 @@ class NN
         
         @nin = nin
         @nout = nout
-		@nhidden = nhidden
-	end
+	@nhidden = nhidden
+    end
 
-	# ''' do the feedforward prediction of a piece of data'''   
+    # ''' do the feedforward prediction of a piece of data'''   
     def predict(input)
         l_size = input.shape[0]
         az = Numo::DFloat.zeros(l_size,@nhidden)
         ar = Numo::DFloat.zeros(l_size,@nhidden)
         ahhat = Numo::DFloat.zeros(l_size,@nhidden)
-		ah = Numo::DFloat.zeros(l_size,@nhidden)
+	ah = Numo::DFloat.zeros(l_size,@nhidden)
 		
         a1 = tanh((input.dot @w1) + @b1)
         pp "a1 is ============"
         pp a1
         pp a1[1,0...a1.shape[1]]
-        # (array slice view) http://ruby-numo.github.io/narray/narray/Numo/DFloat.html#[]-instance_method
+	    
+        # (array slice view) http://ruby-numo.github.io/narray/narray/Numo/DFloat.html#[]-instance_method	    
         x = (Numo::DFloat.zeros(@nhidden)).concatenate(a1[1,0...a1.shape[1]])
         az[1,0...az.shape[1]] = sigm((x.dot @wz) + @bz)
         ar[1,0...ar.shape[1]] = sigm((x.dot @wr) + @br)
         ahhat[1,0...ahhat.shape[1]] = tanh((x.dot @wh) + @bh)
-		ah[1,0...ah.shape[1]] = az[1,0...az.shape[1]]*ahhat[1,0...ahhat.shape[1]]
+	ah[1,0...ah.shape[1]] = az[1,0...az.shape[1]]*ahhat[1,0...ahhat.shape[1]]
 
         # for i in range(1,l_size):
         (1...l_size).each do |i|
@@ -81,10 +82,10 @@ class NN
         end
  
         a2 = tanh((ah.dot @w2) + @b2)
-		return a1,az,ar,ahhat,ah,a2
-	end
+	return a1,az,ar,ahhat,ah,a2
+    end
 
-	def compute_gradients(input,labels)
+    def compute_gradients(input,labels)
         a1,az,ar,ahhat,ah,a2 = predict(input)
         error = (labels - a2)
         
@@ -98,24 +99,24 @@ class NN
 
         # this is ah from the previous timestep
         # getting array at a position in numo/narray is odd. lot of hacks.
-		# ahm1 = (Numo::DFloat.zeros(1,h_size).concatenate(ah[:-1,:])
-		ahm1 = Numo::DFloat.zeros(1,h_size).concatenate(ah.delete(-1,0)) # using delete to return everything but the last
+	# ahm1 = (Numo::DFloat.zeros(1,h_size).concatenate(ah[:-1,:])
+	ahm1 = Numo::DFloat.zeros(1,h_size).concatenate(ah.delete(-1,0)) # using delete to return everything but the last
 
         d2 = error*dtanh(a2)
         e2 = error.dot @w2.transpose
-		dh_next = Numo::DFloat.zeros(1,@nhidden)
+	dh_next = Numo::DFloat.zeros(1,@nhidden)
         
         # for i in range(l_size-1,-1,-1):
         (l_size-1).downto(0) do |i|
             err = e2[i,0...e2.shape[1]] + dh_next
             dz[i,0...dz.shape[1]] = (err*ahhat[i,0...ahhat.shape[1]] - err*ahm1[i,0...ahm1.shape[1]])*dsigm(az[i,0...az.shape[1]])
-			dh[i,0...dh.shape[1]] = err*az[i,0...az.shape[1]]*dtanh(ahhat[i,0...ahhat.shape[1]])
-			dr[i,0...dr.shape[1]] = (dh[i,0...dh.shape[1]].dot((@wh.delete(h_size..-1,0)).transpose))*ahm1[i,0...ahm1.shape[1]]*dsigm(ar[i,0...ar.shape[1]])
+	    dh[i,0...dh.shape[1]] = err*az[i,0...az.shape[1]]*dtanh(ahhat[i,0...ahhat.shape[1]])
+	    dr[i,0...dr.shape[1]] = (dh[i,0...dh.shape[1]].dot((@wh.delete(h_size..-1,0)).transpose))*ahm1[i,0...ahm1.shape[1]]*dsigm(ar[i,0...ar.shape[1]])
 
             dh_next = err*(1-az[i,0...az.shape[1]]) + (dh[i,0...dh.shape[1]].dot(@wh.delete(h_size..-1,0).transpose))*ar[i,0...ar.shape[1]] + (dz[i,0...dz.shape[1]].dot(@wz.delete(h_size..-1,0).transpose)) + (dr[i,0...dr.shape[1]].dot(@wr.delete(h_size..-1,0).transpose))
-			d1[i,0...d1.shape[1]] = (dh[i,0...dh.shape[1]].dot(@wh.delete(0...h_size,0).transpose)) + (dz[i,0...dz.shape[1]].dot(@wz.delete(0...h_size,0).transpose)) + (dr[i,0...dr.shape[1]].dot(@wr.delete(0...h_size,0).transpose))
-		end
-		d1 = d1*dtanh(a1)
+	    d1[i,0...d1.shape[1]] = (dh[i,0...dh.shape[1]].dot(@wh.delete(0...h_size,0).transpose)) + (dz[i,0...dz.shape[1]].dot(@wz.delete(0...h_size,0).transpose)) + (dr[i,0...dr.shape[1]].dot(@wr.delete(0...h_size,0).transpose))
+	end
+	d1 = d1*dtanh(a1)
 
         d1 = d1*dtanh(a1)
         # all the deltas are computed, now compute the gradients
@@ -132,12 +133,12 @@ class NN
         gw1 = 1.0/l_size * (input.transpose.dot d1)
         gb1 = 1.0/l_size * d1.sum(axis:0)
         weight_grads = [gw1,gwr,gwz,gwh,gw2]
-		bias_grads = [gb1,gbr,gbz,gbh,gb2]
+	bias_grads = [gb1,gbr,gbz,gbh,gb2]
 
-		puts "++++++++++++++++++++++++++"
+	puts "++++++++++++++++++++++++++"
         return weight_grads, bias_grads
 		
-	end
+    end
 
 end
 
